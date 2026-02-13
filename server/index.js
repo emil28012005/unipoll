@@ -1,13 +1,20 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
+const path = require('path'); // Нужно для фронтенда
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Подключение к MongoDB
-mongoose.connect('mongodb://127.0.0.1:27017/unipoll')
+// 1. ПОДКЛЮЧЕНИЕ СТАТИКИ (Чтобы твой сайт открывался по ссылке)
+app.use(express.static(path.join(__dirname, '../')));
+
+// 2. ПОДКЛЮЧЕНИЕ К БАЗЕ
+// На Render используем переменную окружения, локально - твою строку
+const mongoURI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/unipoll';
+
+mongoose.connect(mongoURI)
   .then(() => console.log('✅ База данных подключена'))
   .catch(err => console.error('❌ Ошибка базы:', err));
 
@@ -19,7 +26,7 @@ const QuestionSchema = new mongoose.Schema({
 
 const Question = mongoose.model('Question', QuestionSchema);
 
-// ПОЛУЧИТЬ ВСЕ ВОПРОСЫ
+// 3. ТВОИ МАРШРУТЫ API
 app.get('/questions', async (req, res) => {
     try {
         const questions = await Question.find();
@@ -29,18 +36,16 @@ app.get('/questions', async (req, res) => {
     }
 });
 
-// СОХРАНИТЬ ВОПРОС (Теперь возвращает созданный объект с ID)
 app.post('/questions', async (req, res) => {
     try {
         const newQuestion = new Question(req.body);
         const savedQuestion = await newQuestion.save();
-        res.status(201).json(savedQuestion); // Возвращаем вопрос с ID
+        res.status(201).json(savedQuestion);
     } catch (err) {
         res.status(400).json(err);
     }
 });
 
-// УДАЛИТЬ ВОПРОС ПО ID
 app.delete('/questions/:id', async (req, res) => {
     try {
         const result = await Question.findByIdAndDelete(req.params.id);
@@ -54,5 +59,16 @@ app.delete('/questions/:id', async (req, res) => {
     }
 });
 
-const PORT = 5000;
-app.listen(PORT, () => console.log(`🚀 Сервер на порту ${PORT}`));
+// Добавим проверочный путь, который ты открывал
+app.get('/api/status', (req, res) => {
+    res.json({ message: "Server is online!" });
+});
+
+// 4. ГЛАВНЫЙ МАРШРУТ (Отдает твой index.html)
+app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, '../index.html'));
+});
+
+// 5. ПОРТ (Render сам назначает порт, поэтому используем process.env.PORT)
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => console.log(`🚀 Сервер запущен на порту ${PORT}`));
